@@ -9,18 +9,20 @@ fn compute_gamma_epsilon(input: &[&str]) -> (u32, u32) {
     let mut counts = vec![0u32; num_chars];
     for number in ints {
         for i in 0..num_chars {
-            counts[i] += get_bit_at(number, i);
+            counts[i] += get_bit_at(number, num_chars - 1 - i);
         }
     }
-    let mut index = 0u32;
+    let mut index = (num_chars - 1) as u32;
     let mut gamma = 0u32;
     let threshold: u32 = (input.len() / 2) as u32;
-    for count in counts.iter().rev() {
+    for count in counts.iter() {
         let bit = if count > &threshold { 1 } else { 0 };
         gamma |= bit << index;
-        index += 1;
+        if index > 0 {
+            index -= 1;
+        }
     }
-    (gamma, !gamma)
+    (gamma, (!gamma >> (num_chars - 1)))
 }
 
 fn get_bit_at(input: u32, n: usize) -> u32 {
