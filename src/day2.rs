@@ -128,7 +128,7 @@ mod tests {
                 y: 0,
             },
         ];
-        let (forward, depth, aim) = input.iter().fold((0i32, 0i32, 0i32), apply_instruction);
+        let (forward, depth, _) = input.iter().fold((0i32, 0i32, 0i32), apply_instruction);
         assert_eq!(forward, 15);
         assert_eq!(depth, 60);
         assert_eq!(forward * depth, 900);
