@@ -15,3 +15,14 @@ pub fn parse_ints(line: &str, separator: &str) -> Vec<u32> {
         .filter_map(|v| v.parse::<u32>().ok())
         .collect()
 }
+
+pub fn filter_ok_lines<P>(filename: P) -> Vec<String>
+where
+    P: AsRef<Path>,
+{
+    read_lines(filename)
+        .unwrap()
+        .filter_map(|l| l.ok())
+        .filter(|l| l.len() > 0)
+        .collect()
+}
