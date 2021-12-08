@@ -66,9 +66,6 @@ pub fn main() {
     println!("Day 7 - 1: {}", fuel);
     let (pos, fuel) = solve(&input, incremental_fuel_consumption);
     println!("Day 7 - 2: {} {}", pos, fuel);
-    let mut cache = Cache::new();
-    let cost = cost(pos as i32, &input, &mut cache, incremental_fuel_consumption);
-    println!("Comp: {}", cost);
 }
 
 type Cache = HashMap<i32, i32>;
@@ -76,36 +73,8 @@ lazy_static! {
     static ref DISTCACHE: RwLock<Cache> = RwLock::new(HashMap::new());
 }
 
-fn incremental_fuel_consumption(dist: i32) -> i32 {
-    let mut last_value = 0;
-    for d in 1..=dist {
-        last_value += d;
-    }
-    last_value
-}
-
-fn incremental_fuel_consumption_2(dist: i32) -> i32 {
-    let (last_distance, value) = {
-        let map = DISTCACHE.read().unwrap();
-        let mut last_cached = (1, 1);
-        for d in (1..dist).rev() {
-            if let Some(value) = map.get(&d) {
-                last_cached = (d, *value);
-                break;
-            }
-        }
-        last_cached
-    };
-    if last_distance == dist {
-        return value;
-    }
-    let mut last_value = value;
-    let mut map = DISTCACHE.write().unwrap();
-    for d in (last_distance)..=dist {
-        last_value += d;
-        map.insert(d, last_value);
-    }
-    last_value
+fn incremental_fuel_consumption(d: i32) -> i32 {
+    d * (d + 1) / 2
 }
 
 fn linear_fuel_consumption(dist: i32) -> i32 {
