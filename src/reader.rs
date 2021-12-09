@@ -16,7 +16,7 @@ pub fn parse_ints(line: &str, separator: &str) -> Vec<u32> {
         .collect()
 }
 
-pub fn filter_ok_lines<P>(filename: P) -> Vec<String>
+pub fn read_lines_filter_ok<P>(filename: P) -> Vec<String>
 where
     P: AsRef<Path>,
 {

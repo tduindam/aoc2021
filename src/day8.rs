@@ -1,12 +1,12 @@
-use crate::reader::filter_ok_lines;
+use crate::reader::read_lines_filter_ok;
 
 pub fn main() {
-    let input = filter_ok_lines("input/day8")
+    let input = read_lines_filter_ok("input/day8")
         .iter()
         .filter_map(|s| parse_line(s).ok())
         .collect();
     println!("Day 8-1: {}", count_easies(input));
-    let input = filter_ok_lines("input/day8")
+    let input = read_lines_filter_ok("input/day8")
         .iter()
         .filter_map(|s| parse_line(s).ok())
         .collect();
