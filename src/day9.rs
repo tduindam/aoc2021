@@ -6,7 +6,7 @@ pub fn main() {
     let col_size = input.len();
     let grid = Grid::new(parse_grid(&input), row_size, col_size);
     println!("Day 9-1 {}", grid.risk_score());
-    println!("Day 9-1 {}", grid.basin_score());
+    println!("Day 9-2 {}", grid.basin_score());
 }
 
 struct Grid {

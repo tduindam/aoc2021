@@ -2,6 +2,7 @@ use std::env;
 use std::time::Instant;
 
 mod day1;
+mod day10;
 mod day2;
 mod day3;
 mod day4;
@@ -34,6 +35,7 @@ fn main() {
             7 => day7::main(),
             8 => day8::main(),
             9 => day9::main(),
+            10 => day10::main(),
             _ => eprintln!("No such day ({})", day),
         },
         Err(e) => eprintln!("Could not parse input {:?}", e),
