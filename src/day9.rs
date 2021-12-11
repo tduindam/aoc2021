@@ -1,10 +1,9 @@
+use crate::reader::parse_grid;
+
 pub fn main() {
-    let input: Vec<String> = REAL_INPUT.split("\n").map(|l| l.to_string()).collect();
-    let col_size = input.len();
-    let parsed = parse_grid(&input);
-    let row_size = parsed.len() / col_size;
-    let col_size = input.len();
-    let grid = Grid::new(parse_grid(&input), row_size, col_size);
+    let ((row_size, col_size), parsed) = parse_grid(REAL_INPUT);
+
+    let grid = Grid::new(parsed, row_size, col_size);
     println!("Day 9-1 {}", grid.risk_score());
     println!("Day 9-2 {}", grid.basin_score());
 }
@@ -125,14 +124,6 @@ impl Grid {
     }
 }
 
-fn parse_grid(lines: &Vec<String>) -> Vec<u32> {
-    lines
-        .iter()
-        .map(|l| l.chars().filter_map(|c| c.to_digit(10)))
-        .flatten()
-        .collect()
-}
-
 const REAL_INPUT: &'static str =
     "9234598321279999876543212397634598789843210123456789212999878987556456999878965432459101987654567899
 8965987432367898989864301986545789698765421939697894349876967896432349899769896543598929898763478998
@@ -237,22 +228,19 @@ const REAL_INPUT: &'static str =
 
 #[cfg(test)]
 mod test {
+    use crate::reader::parse_grid;
+
     use super::*;
 
     #[test]
     fn part_one_small() {
-        let input: Vec<String> = "2199943210
+        let raw = "2199943210
 3987894921
 9856789892
 8767896789
-9899965678"
-            .split("\n")
-            .map(|l| l.to_string())
-            .collect();
-        let col_size = input.len();
-        let parsed = parse_grid(&input);
-        let row_size = parsed.len() / col_size;
-        println!("input {:?}", input);
+9899965678";
+
+        let ((col_size, row_size), parsed) = parse_grid(raw);
         let grid = Grid::new(parsed, row_size, col_size);
 
         let mins = grid.local_mins();
