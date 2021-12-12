@@ -1,3 +1,24 @@
+use crate::reader::parse_grid;
+
+pub fn main() {
+    println!("Day 11 - 1: {}", run_real_input_part_one());
+}
+
+fn run_real_input_part_one() -> u32 {
+    let input = "1172728874
+    6751454281
+    2612343533
+    1884877511
+    7574346247
+    2117413745
+    7766736517
+    4331783444
+    4841215828
+    6857766273";
+    let ((row_size, col_size), parsed) = parse_grid(input);
+    simulate(100, parsed, (row_size as u32, col_size as u32))
+}
+
 fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> u32 {
     let neighbor_map: Vec<Vec<usize>> = (0..grid.len())
         .map(|i| PosType::from_index(i as u32, (row_size, col_size)))
@@ -15,27 +36,31 @@ fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> 
         for index in 0..grid.len() {
             let count = grid.get_mut(index).unwrap();
             *count += 1;
-            if *count == 9 {
+            if *count > 9 {
                 glow_queue.push(index);
+                let neighbors = neighbor_map.get(index).unwrap();
+                glow_queue.extend(neighbors);
+                all_glows += 1;
             }
         }
-        all_glows += glow_queue.len() as u32;
+
         while !glow_queue.is_empty() {
             let index = glow_queue.pop().unwrap();
             let value = grid.get_mut(index).unwrap();
-            if *value == 9 {
+            if *value > 9 {
                 continue;
             }
             *value += 1;
-            all_glows += 1;
-            if *value == 9 {
+
+            if *value > 9 {
                 let neighbors = neighbor_map.get(index).unwrap();
                 glow_queue.extend(neighbors);
+                all_glows += 1;
             }
         }
         for index in 0..grid.len() {
             let count = grid.get_mut(index).unwrap();
-            if *count == 9 {
+            if *count > 9 {
                 *count = 0;
             }
         }
@@ -88,7 +113,7 @@ impl PosType {
             (x, 0) if x == max_x => PosType::RT,
             (_, 0) => PosType::T,
             (0, y) if y == max_y => PosType::LB,
-            (_, y) if y == max_y => PosType::RB,
+            (x, y) if y == max_y && x == max_x => PosType::RB,
             (_, y) if y == max_y => PosType::B,
             (0, _) => PosType::L,
             (x, _) if x == max_x => PosType::R,
@@ -119,7 +144,7 @@ const LB_NEIGHBORS: [(i8, i8); 3] = [(0, -1), (1, -1), (1, 0)];
 
 #[cfg(test)]
 mod test {
-    use crate::day11::{neighbors, simulate, PosType};
+    use crate::day11::{neighbors, run_real_input_part_one, simulate, PosType};
     use crate::reader::parse_grid;
 
     #[test]
@@ -139,19 +164,17 @@ mod test {
     }
 
     #[test]
-    fn count_neighbors_b() {
-        let expected: [u32; 9] = [0, 0, 0, 2, 3, 2, 3, 5, 3];
-        let neighbors = (6u32..9)
-            .map(|i| PosType::from_index(i, (3, 3)))
-            .map(|(p, t)| neighbors(p, t))
-            .flatten();
-
-        let mut result: [u32; 9] = [0u32; 9];
-        for (x, y) in neighbors {
-            result[(x + y * 3) as usize] += 1;
-        }
-
-        assert_eq!(expected, result);
+    fn part_one_simple() {
+        let input = "11111
+19991
+19191
+19991
+11111";
+        let ((row_size, col_size), parsed) = parse_grid(input);
+        assert_eq!(
+            9,
+            simulate(1, parsed.clone(), (row_size as u32, col_size as u32))
+        );
     }
 
     #[test]
@@ -169,7 +192,7 @@ mod test {
 
         let ((row_size, col_size), parsed) = parse_grid(input);
         assert_eq!(
-            9,
+            0,
             simulate(1, parsed.clone(), (row_size as u32, col_size as u32))
         );
 
@@ -177,5 +200,10 @@ mod test {
             1656,
             simulate(100, parsed, (row_size as u32, col_size as u32))
         );
+    }
+
+    #[test]
+    fn part_one_real_input() {
+        assert_eq!(1644, run_real_input_part_one());
     }
 }
