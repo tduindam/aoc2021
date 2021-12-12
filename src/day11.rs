@@ -4,6 +4,11 @@ pub fn main() {
     println!("Day 11 - 1: {}", run_real_input_part_one());
 }
 
+enum StopCriterium {
+    Days(u32),
+    Synchronized,
+}
+
 fn run_real_input_part_one() -> u32 {
     let input = "1172728874
     6751454281
@@ -16,10 +21,39 @@ fn run_real_input_part_one() -> u32 {
     4841215828
     6857766273";
     let ((row_size, col_size), parsed) = parse_grid(input);
-    simulate(100, parsed, (row_size as u32, col_size as u32))
+    let (glows, _) = simulate(
+        StopCriterium::Days(100),
+        parsed,
+        (row_size as u32, col_size as u32),
+    );
+    glows
 }
 
-fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> u32 {
+fn run_real_input_part_two() -> u32 {
+    let input = "1172728874
+    6751454281
+    2612343533
+    1884877511
+    7574346247
+    2117413745
+    7766736517
+    4331783444
+    4841215828
+    6857766273";
+    let ((row_size, col_size), parsed) = parse_grid(input);
+    let (_, days) = simulate(
+        StopCriterium::Synchronized,
+        parsed,
+        (row_size as u32, col_size as u32),
+    );
+    days
+}
+
+fn simulate(
+    stop: StopCriterium,
+    mut grid: Vec<u32>,
+    (row_size, col_size): (u32, u32),
+) -> (u32, u32) {
     let neighbor_map: Vec<Vec<usize>> = (0..grid.len())
         .map(|i| PosType::from_index(i as u32, (row_size, col_size)))
         .map(|((x, y), t)| {
@@ -30,8 +64,10 @@ fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> 
         .collect();
     let mut all_glows = 0u32;
     let mut glow_queue = Vec::<usize>::new();
-    for _ in 0..days {
+    let mut day = 0u32;
+    loop {
         glow_queue.clear();
+        let mut glow_this_day = 0u32;
         //increment all elements in grid
         for index in 0..grid.len() {
             let count = grid.get_mut(index).unwrap();
@@ -40,7 +76,7 @@ fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> 
                 glow_queue.push(index);
                 let neighbors = neighbor_map.get(index).unwrap();
                 glow_queue.extend(neighbors);
-                all_glows += 1;
+                glow_this_day += 1;
             }
         }
 
@@ -55,7 +91,7 @@ fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> 
             if *value > 9 {
                 let neighbors = neighbor_map.get(index).unwrap();
                 glow_queue.extend(neighbors);
-                all_glows += 1;
+                glow_this_day += 1;
             }
         }
         for index in 0..grid.len() {
@@ -64,8 +100,22 @@ fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> 
                 *count = 0;
             }
         }
+        all_glows += glow_this_day;
+        day += 1;
+        match stop {
+            StopCriterium::Days(criterium) => {
+                if day >= criterium {
+                    break;
+                }
+            }
+            StopCriterium::Synchronized => {
+                if glow_this_day == row_size * col_size {
+                    break;
+                }
+            }
+        }
     }
-    all_glows
+    (all_glows, day)
 }
 
 fn neighbors(
@@ -144,7 +194,10 @@ const LB_NEIGHBORS: [(i8, i8); 3] = [(0, -1), (1, -1), (1, 0)];
 
 #[cfg(test)]
 mod test {
-    use crate::day11::{neighbors, run_real_input_part_one, simulate, PosType};
+    use crate::day11::{
+        neighbors, run_real_input_part_one, run_real_input_part_two, simulate, PosType,
+        StopCriterium,
+    };
     use crate::reader::parse_grid;
 
     #[test]
@@ -171,10 +224,12 @@ mod test {
 19991
 11111";
         let ((row_size, col_size), parsed) = parse_grid(input);
-        assert_eq!(
-            9,
-            simulate(1, parsed.clone(), (row_size as u32, col_size as u32))
+        let (glows, _) = simulate(
+            StopCriterium::Days(1),
+            parsed.clone(),
+            (row_size as u32, col_size as u32),
         );
+        assert_eq!(9, glows);
     }
 
     #[test]
@@ -193,17 +248,31 @@ mod test {
         let ((row_size, col_size), parsed) = parse_grid(input);
         assert_eq!(
             0,
-            simulate(1, parsed.clone(), (row_size as u32, col_size as u32))
+            simulate(
+                StopCriterium::Days(1),
+                parsed.clone(),
+                (row_size as u32, col_size as u32)
+            )
+            .0
         );
 
         assert_eq!(
             1656,
-            simulate(100, parsed, (row_size as u32, col_size as u32))
+            simulate(
+                StopCriterium::Days(100),
+                parsed,
+                (row_size as u32, col_size as u32)
+            )
+            .0
         );
     }
 
     #[test]
     fn part_one_real_input() {
         assert_eq!(1644, run_real_input_part_one());
+    }
+    #[test]
+    fn part_two_real_input() {
+        assert_eq!(229, run_real_input_part_two());
     }
 }
