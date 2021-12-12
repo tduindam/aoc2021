@@ -139,6 +139,22 @@ mod test {
     }
 
     #[test]
+    fn count_neighbors_b() {
+        let expected: [u32; 9] = [0, 0, 0, 2, 3, 2, 3, 5, 3];
+        let neighbors = (6u32..9)
+            .map(|i| PosType::from_index(i, (3, 3)))
+            .map(|(p, t)| neighbors(p, t))
+            .flatten();
+
+        let mut result: [u32; 9] = [0u32; 9];
+        for (x, y) in neighbors {
+            result[(x + y * 3) as usize] += 1;
+        }
+
+        assert_eq!(expected, result);
+    }
+
+    #[test]
     fn part_one() {
         let input = "5483143223
 2745854711
