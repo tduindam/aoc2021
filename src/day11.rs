@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 fn simulate(days: u32, mut grid: Vec<u32>, (row_size, col_size): (u32, u32)) -> u32 {
     let neighbor_map: Vec<Vec<usize>> = (0..grid.len())
         .map(|i| PosType::from_index(i as u32, (row_size, col_size)))
@@ -117,12 +115,28 @@ const B_NEIGHBORS: [(i8, i8); 5] = [(-1, 0), (1, 0), (-1, -1), (0, -1), (1, -1)]
 const LT_NEIGHBORS: [(i8, i8); 3] = [(1, 0), (0, 1), (1, 1)];
 const RT_NEIGHBORS: [(i8, i8); 3] = [(-1, 0), (-1, 1), (0, 1)];
 const RB_NEIGHBORS: [(i8, i8); 3] = [(-1, -1), (0, -1), (-1, 0)];
-const LB_NEIGHBORS: [(i8, i8); 3] = [(0, -1), (1, -1), (0, -0)];
+const LB_NEIGHBORS: [(i8, i8); 3] = [(0, -1), (1, -1), (1, 0)];
 
 #[cfg(test)]
 mod test {
-    use crate::day11::simulate;
+    use crate::day11::{neighbors, simulate, PosType};
     use crate::reader::parse_grid;
+
+    #[test]
+    fn count_neighbors() {
+        let expected: [u32; 9] = [3, 5, 3, 5, 8, 5, 3, 5, 3];
+        let neighbors = (0u32..9)
+            .map(|i| PosType::from_index(i, (3, 3)))
+            .map(|(p, t)| neighbors(p, t))
+            .flatten();
+
+        let mut result: [u32; 9] = [0u32; 9];
+        for (x, y) in neighbors {
+            result[(x + y * 3) as usize] += 1;
+        }
+
+        assert_eq!(expected, result);
+    }
 
     #[test]
     fn part_one() {
