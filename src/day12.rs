@@ -4,7 +4,7 @@ use crate::reader::split_list;
 
 type Node = String;
 type NodeList = Vec<String>;
-type Path = Vec<String>;
+type Path = (Vec<String>, bool);
 type EdgeMap = HashMap<Node, NodeList>;
 
 enum NodeType {
@@ -24,12 +24,12 @@ fn node_type(node: &str) -> NodeType {
 }
 
 fn append(new: &str, path: &Path) -> Path {
-    let mut p = path.clone();
+    let (mut p, d) = path.clone();
     p.push(new.to_string());
-    p
+    (p, d)
 }
 
-fn find_paths(input: &str) -> Vec<Path> {
+fn find_paths(input: &str, allow_second_small: bool) -> Vec<Path> {
     let lines = split_list(input);
     let mut edges = EdgeMap::new();
     for line in lines {
@@ -39,12 +39,12 @@ fn find_paths(input: &str) -> Vec<Path> {
         .get("start")
         .unwrap()
         .iter()
-        .map(|n| vec!["start".to_string(), n.to_string()])
+        .map(|n| (vec!["start".to_string(), n.to_string()], false))
         .collect();
     let mut finished_routes = Vec::<Path>::new();
     while !routes.is_empty() {
-        let mut cur_path = routes.pop().unwrap();
-        let cur_node = cur_path.last().unwrap();
+        let cur_path = routes.pop().unwrap();
+        let cur_node = cur_path.0.last().unwrap();
         let outgoing = edges.get(cur_node).unwrap();
         for next_node in outgoing.iter() {
             let node_type = node_type(next_node);
@@ -55,9 +55,19 @@ fn find_paths(input: &str) -> Vec<Path> {
                     finished_routes.push(p);
                 }
                 NodeType::Small => {
-                    if !cur_path.contains(next_node) {
-                        let p = append(next_node, &cur_path);
-                        routes.push(p);
+                    let (p, has_second) = &cur_path;
+                    if allow_second_small {
+                        let in_cur_path = p.contains(next_node);
+                        let do_insert = !in_cur_path || (in_cur_path && !*has_second);
+                        if do_insert {
+                            let (p, _) = append(next_node, &cur_path);
+                            routes.push((p, in_cur_path || *has_second));
+                        }
+                    } else {
+                        if !p.contains(next_node) {
+                            let p = append(next_node, &cur_path);
+                            routes.push(p);
+                        }
                     }
                 }
                 NodeType::Big => {
@@ -91,8 +101,6 @@ fn parse(input: &str, edges: &mut EdgeMap) {
 
 #[cfg(test)]
 mod test {
-    use crate::reader::split_list;
-
     use super::*;
 
     #[test]
@@ -114,7 +122,7 @@ A-b
 b-d
 A-end
 b-end";
-        assert_eq!(10, find_paths(input).len());
+        assert_eq!(10, find_paths(input, false).len());
     }
 
     #[test]
@@ -141,6 +149,45 @@ gn-sp
 gn-FK
 sp-FK
 yh-gc";
-        assert_eq!(3713, find_paths(input).len());
+        assert_eq!(3713, find_paths(input, false).len());
+    }
+
+    #[test]
+    fn part_two_small() {
+        let input = "start-A
+start-b
+A-c
+A-b
+b-d
+A-end
+b-end";
+        assert_eq!(36, find_paths(input, true).len());
+    }
+
+    #[test]
+    fn part_two() {
+        let input = "FK-gc
+gc-start
+gc-dw
+sp-FN
+dw-end
+FK-start
+dw-gn
+AN-gn
+yh-gn
+yh-start
+sp-AN
+ik-dw
+FK-dw
+end-sp
+yh-FK
+gc-gn
+AN-end
+dw-AN
+gn-sp
+gn-FK
+sp-FK
+yh-gc";
+        assert_eq!(91292, find_paths(input, true).len());
     }
 }
