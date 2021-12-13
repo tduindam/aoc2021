@@ -16,6 +16,10 @@ pub fn parse_ints(line: &str, separator: &str) -> Vec<u32> {
         .collect()
 }
 
+pub fn split_list(input: &str) -> Vec<String> {
+    input.split("\n").map(|l| l.to_string()).collect()
+}
+
 pub fn parse_grid(raw_input: &str) -> ((usize, usize), Vec<u32>) {
     let input: Vec<String> = raw_input.split("\n").map(|l| l.to_string()).collect();
     let col_size = input.len();

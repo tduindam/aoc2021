@@ -2,6 +2,7 @@ use crate::reader::parse_grid;
 
 pub fn main() {
     println!("Day 11 - 1: {}", run_real_input_part_one());
+    println!("Day 11 - 2: {}", run_real_input_part_two());
 }
 
 enum StopCriterium {
