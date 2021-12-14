@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::reader::read_lines_filter_ok;
 
-type InstructionMap = HashMap<((char, char)), char>;
+type InstructionMap = HashMap<(char, char), char>;
 
 pub fn main() {
     let lines = read_lines_filter_ok("input/day14");
@@ -11,7 +11,7 @@ pub fn main() {
 }
 
 fn expansion_score_2(input: &String, instructions: &InstructionMap, iterations: u32) -> u128 {
-    let counts = expand_2(input, instructions, iterations);
+    let counts = expand_3(input, instructions, iterations);
     let mut vec: Vec<u128> = counts.into_values().collect();
     vec.sort();
     vec.last().unwrap() - vec[0]
@@ -30,6 +30,46 @@ fn expansion_score(input: &String, instructions: &InstructionMap, iterations: u3
     let mut vec: Vec<u32> = counts.into_values().collect();
     vec.sort();
     vec.last().unwrap() - vec[0]
+}
+
+fn expand_r(
+    elem: (char, char),
+    instructions: &InstructionMap,
+    counts: &mut HashMap<char, u128>,
+    cur_depth: u32,
+    max_depth: u32,
+) {
+    let c = *instructions.get(&elem).unwrap();
+    *counts.entry(c).or_insert(0) += 1;
+    let (c0, c1) = elem;
+    if cur_depth != max_depth {
+        expand_r((c0, c), instructions, counts, cur_depth + 1, max_depth);
+        // expand_r((c, c1), instructions, counts, cur_depth + 1, max_depth);
+    }
+}
+
+fn expand_3(input: &String, instructions: &InstructionMap, iterations: u32) -> HashMap<char, u128> {
+    let mut counts = HashMap::<char, u128>::new();
+
+    for c in input.chars() {
+        *counts.entry(c).or_insert(0) += 1;
+    }
+    let mut start: Vec<(char, char)> = input
+        .chars()
+        .collect::<Vec<char>>()
+        .windows(2)
+        .map(|pair| {
+            let mut it = pair.iter();
+            (*it.next().unwrap(), *it.next().unwrap())
+        })
+        .collect();
+
+    for v in start {
+        expand_r(v, instructions, &mut counts, 0, iterations);
+        println!("counts {:?}", counts);
+        println!("b");
+    }
+    counts
 }
 
 fn expand_2(input: &String, instructions: &InstructionMap, iterations: u32) -> HashMap<char, u128> {
