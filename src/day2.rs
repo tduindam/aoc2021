@@ -62,7 +62,6 @@ impl FromStr for Direction {
 
 #[derive(Debug)]
 struct Instruction {
-    pub direction: Direction,
     pub x: i32,
     pub y: i32,
 }
@@ -86,7 +85,7 @@ impl FromStr for Instruction {
             Direction::Up => (0, -increment),
             Direction::Down => (0, increment),
         };
-        Ok(Self { direction, x, y })
+        Ok(Self { x, y })
     }
 }
 
@@ -97,36 +96,12 @@ mod tests {
     #[test]
     fn part_two() {
         let input = vec![
-            Instruction {
-                direction: Direction::Forward,
-                x: 5,
-                y: 0,
-            },
-            Instruction {
-                direction: Direction::Down,
-                x: 0,
-                y: 5,
-            },
-            Instruction {
-                direction: Direction::Forward,
-                x: 8,
-                y: 0,
-            },
-            Instruction {
-                direction: Direction::Up,
-                x: 0,
-                y: -3,
-            },
-            Instruction {
-                direction: Direction::Down,
-                x: 0,
-                y: 8,
-            },
-            Instruction {
-                direction: Direction::Forward,
-                x: 2,
-                y: 0,
-            },
+            Instruction { x: 5, y: 0 },
+            Instruction { x: 0, y: 5 },
+            Instruction { x: 8, y: 0 },
+            Instruction { x: 0, y: -3 },
+            Instruction { x: 0, y: 8 },
+            Instruction { x: 2, y: 0 },
         ];
         let (forward, depth, _) = input.iter().fold((0i32, 0i32, 0i32), apply_instruction);
         assert_eq!(forward, 15);

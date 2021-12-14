@@ -5,6 +5,7 @@ mod day1;
 mod day10;
 mod day11;
 mod day12;
+mod day13;
 mod day2;
 mod day3;
 mod day4;
@@ -38,6 +39,7 @@ fn main() {
             8 => day8::main(),
             9 => day9::main(),
             10 => day10::main(),
+            11 => day11::main(),
             _ => eprintln!("No such day ({})", day),
         },
         Err(e) => eprintln!("Could not parse input {:?}", e),
