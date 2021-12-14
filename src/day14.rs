@@ -1,13 +1,20 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::reader::read_lines_filter_ok;
 
-type InstructionMap = HashMap<String, char>;
+type InstructionMap = HashMap<((char, char)), char>;
 
 pub fn main() {
     let lines = read_lines_filter_ok("input/day14");
     let (start, instructions) = parse_lines(&lines);
-    println!("Day 14-2 {}", expansion_score(&start, &instructions, 40));
+    println!("Day 14-2 {}", expansion_score_2(&start, &instructions, 40));
+}
+
+fn expansion_score_2(input: &String, instructions: &InstructionMap, iterations: u32) -> u128 {
+    let counts = expand_2(input, instructions, iterations);
+    let mut vec: Vec<u128> = counts.into_values().collect();
+    vec.sort();
+    vec.last().unwrap() - vec[0]
 }
 
 fn expansion_score(input: &String, instructions: &InstructionMap, iterations: u32) -> u32 {
@@ -25,14 +32,48 @@ fn expansion_score(input: &String, instructions: &InstructionMap, iterations: u3
     vec.last().unwrap() - vec[0]
 }
 
+fn expand_2(input: &String, instructions: &InstructionMap, iterations: u32) -> HashMap<char, u128> {
+    let mut counts = HashMap::<char, u128>::new();
+
+    for c in input.chars() {
+        *counts.entry(c).or_insert(0) += 1;
+    }
+    let mut queue: VecDeque<(char, char)> = input
+        .chars()
+        .collect::<Vec<char>>()
+        .windows(2)
+        .map(|pair| {
+            let mut it = pair.iter();
+            (*it.next().unwrap(), *it.next().unwrap())
+        })
+        .collect();
+    queue.push_back(('X', 'X'));
+    let mut iteration_counter = 0;
+    while iteration_counter < iterations {
+        let next = queue.pop_front().unwrap();
+        if next == ('X', 'X') {
+            queue.push_back(('X', 'X'));
+            iteration_counter += 1;
+            println!("Round {}", iteration_counter);
+            continue;
+        }
+        let new_char = instructions.get(&next).unwrap();
+        *counts.entry(*new_char).or_insert(0) += 1;
+        let (c0, c1) = next;
+        queue.push_back((c0, *new_char));
+        queue.push_back((*new_char, c1));
+        // println!("Q {:?}", queue);
+    }
+    counts
+}
+
 fn expand(input: &String, instructions: &InstructionMap) -> String {
     let mut exp = input
         .chars()
         .collect::<Vec<char>>()
         .windows(2)
         .map(|pair| {
-            let key = pair.iter().collect::<String>();
-            let new_elem = instructions.get(&key).unwrap();
+            let new_elem = instructions.get(&(pair[0], pair[1])).unwrap();
             vec![pair[0], *new_elem].iter().collect::<String>()
         })
         .collect::<String>();
@@ -47,7 +88,8 @@ fn parse_lines(lines: &Vec<String>) -> (String, InstructionMap) {
         .skip(2)
         .map(|l| {
             let mut chunks = l.split("->");
-            let pair = chunks.next().unwrap().trim().to_string();
+            let mut in_chars = chunks.next().unwrap().trim().chars();
+            let pair = ((in_chars.next().unwrap(), in_chars.next().unwrap()));
             let output = chunks.next().unwrap().trim().chars().next().unwrap();
             (pair, output)
         })
@@ -99,6 +141,8 @@ CN -> C";
             expanded
         );
         assert_eq!(1588, expansion_score(&start, &instructions, 10));
+        assert_eq!(1, expansion_score_2(&start, &instructions, 1));
+        assert_eq!(1588, expansion_score_2(&start, &instructions, 10));
     }
 
     #[test]
@@ -106,12 +150,13 @@ CN -> C";
         let lines = read_lines_filter_ok("input/day14");
         let (start, instructions) = parse_lines(&lines);
         assert_eq!(3587, expansion_score(&start, &instructions, 10));
+        assert_eq!(3587, expansion_score_2(&start, &instructions, 10));
     }
 
     #[test]
     fn part_two() {
         let lines = read_lines_filter_ok("input/day14");
         let (start, instructions) = parse_lines(&lines);
-        assert_eq!(3587, expansion_score(&start, &instructions, 40));
+        assert_eq!(3587, expansion_score_2(&start, &instructions, 25));
     }
 }
