@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use crate::reader::read_lines_filter_ok;
 
@@ -7,118 +7,46 @@ type InstructionMap = HashMap<(char, char), char>;
 pub fn main() {
     let lines = read_lines_filter_ok("input/day14");
     let (start, instructions) = parse_lines(&lines);
-    println!("Day 14-2 {}", expansion_score_2(&start, &instructions, 40));
+    println!("Day 14-2 {}", expansion_score(&start, &instructions, 40));
 }
 
-fn expansion_score_2(input: &String, instructions: &InstructionMap, iterations: u32) -> u128 {
-    let counts = expand_3(input, instructions, iterations);
+fn expansion_score(input: &String, instructions: &InstructionMap, iterations: u32) -> u128 {
+    let counts = expand(input, instructions, iterations);
     let mut vec: Vec<u128> = counts.into_values().collect();
     vec.sort();
     vec.last().unwrap() - vec[0]
 }
 
-fn expansion_score(input: &String, instructions: &InstructionMap, iterations: u32) -> u32 {
-    let mut expanded = input.to_string();
-    for i in 0..iterations {
-        expanded = expand(&expanded, &instructions);
-        println!("Round {} size {}", i, expanded.len());
-    }
-    let mut counts = HashMap::<char, u32>::new();
-    for c in expanded.chars() {
-        *counts.entry(c).or_insert(0) += 1;
-    }
-    let mut vec: Vec<u32> = counts.into_values().collect();
-    vec.sort();
-    vec.last().unwrap() - vec[0]
-}
-
-fn expand_r(
-    elem: (char, char),
-    instructions: &InstructionMap,
-    counts: &mut HashMap<char, u128>,
-    cur_depth: u32,
-    max_depth: u32,
-) {
-    let c = *instructions.get(&elem).unwrap();
-    *counts.entry(c).or_insert(0) += 1;
-    let (c0, c1) = elem;
-    if cur_depth != max_depth {
-        expand_r((c0, c), instructions, counts, cur_depth + 1, max_depth);
-        // expand_r((c, c1), instructions, counts, cur_depth + 1, max_depth);
-    }
-}
-
-fn expand_3(input: &String, instructions: &InstructionMap, iterations: u32) -> HashMap<char, u128> {
+fn expand(input: &String, instructions: &InstructionMap, iterations: u32) -> HashMap<char, u128> {
+    type InvocationMap = HashMap<(char, char), u64>;
     let mut counts = HashMap::<char, u128>::new();
+    fn add_invocation(key: (char, char), map: &mut InvocationMap, count: u64) {
+        *map.entry(key).or_insert(0) += count;
+    }
 
     for c in input.chars() {
         *counts.entry(c).or_insert(0) += 1;
     }
-    let mut start: Vec<(char, char)> = input
-        .chars()
-        .collect::<Vec<char>>()
-        .windows(2)
-        .map(|pair| {
-            let mut it = pair.iter();
-            (*it.next().unwrap(), *it.next().unwrap())
-        })
-        .collect();
-
-    for v in start {
-        expand_r(v, instructions, &mut counts, 0, iterations);
-        println!("counts {:?}", counts);
-        println!("b");
+    let mut invocations_next_round = InvocationMap::new();
+    for starting_pair in input.chars().collect::<Vec<char>>().windows(2) {
+        add_invocation(
+            (starting_pair[0], starting_pair[1]),
+            &mut invocations_next_round,
+            1,
+        );
     }
-    counts
-}
-
-fn expand_2(input: &String, instructions: &InstructionMap, iterations: u32) -> HashMap<char, u128> {
-    let mut counts = HashMap::<char, u128>::new();
-
-    for c in input.chars() {
-        *counts.entry(c).or_insert(0) += 1;
-    }
-    let mut queue: VecDeque<(char, char)> = input
-        .chars()
-        .collect::<Vec<char>>()
-        .windows(2)
-        .map(|pair| {
-            let mut it = pair.iter();
-            (*it.next().unwrap(), *it.next().unwrap())
-        })
-        .collect();
-    queue.push_back(('X', 'X'));
-    let mut iteration_counter = 0;
-    while iteration_counter < iterations {
-        let next = queue.pop_front().unwrap();
-        if next == ('X', 'X') {
-            queue.push_back(('X', 'X'));
-            iteration_counter += 1;
-            println!("Round {}", iteration_counter);
-            continue;
+    for _ in 0..iterations {
+        let mut next_invocations = InvocationMap::new();
+        for ((c0, c1), count) in invocations_next_round {
+            let c = *instructions.get(&(c0, c1)).unwrap();
+            *counts.entry(c).or_insert(0) += count as u128;
+            add_invocation((c0, c), &mut next_invocations, count);
+            add_invocation((c, c1), &mut next_invocations, count);
         }
-        let new_char = instructions.get(&next).unwrap();
-        *counts.entry(*new_char).or_insert(0) += 1;
-        let (c0, c1) = next;
-        queue.push_back((c0, *new_char));
-        queue.push_back((*new_char, c1));
-        // println!("Q {:?}", queue);
+        invocations_next_round = next_invocations;
     }
-    counts
-}
 
-fn expand(input: &String, instructions: &InstructionMap) -> String {
-    let mut exp = input
-        .chars()
-        .collect::<Vec<char>>()
-        .windows(2)
-        .map(|pair| {
-            let new_elem = instructions.get(&(pair[0], pair[1])).unwrap();
-            vec![pair[0], *new_elem].iter().collect::<String>()
-        })
-        .collect::<String>();
-    exp.push(input.chars().last().unwrap());
-    exp
+    counts
 }
 
 fn parse_lines(lines: &Vec<String>) -> (String, InstructionMap) {
@@ -129,7 +57,7 @@ fn parse_lines(lines: &Vec<String>) -> (String, InstructionMap) {
         .map(|l| {
             let mut chunks = l.split("->");
             let mut in_chars = chunks.next().unwrap().trim().chars();
-            let pair = ((in_chars.next().unwrap(), in_chars.next().unwrap()));
+            let pair = (in_chars.next().unwrap(), in_chars.next().unwrap());
             let output = chunks.next().unwrap().trim().chars().next().unwrap();
             (pair, output)
         })
@@ -168,21 +96,7 @@ CN -> C";
 
         assert_eq!("NNCB", start);
         assert_eq!(16, instructions.len());
-        println!("instructions {:?}", instructions);
-        let expanded = expand(&start, &instructions);
-        assert_eq!("NCNBCHB", expanded);
-        let expanded = expand(&expanded, &instructions);
-        assert_eq!("NBCCNBBBCBHCB", expanded);
-        let expanded = expand(&expanded, &instructions);
-        assert_eq!("NBBBCNCCNBBNBNBBCHBHHBCHB", expanded);
-        let expanded = expand(&expanded, &instructions);
-        assert_eq!(
-            "NBBNBNBBCCNBCNCCNBBNBBNBBBNBBNBBCBHCBHHNHCBBCBHCB",
-            expanded
-        );
         assert_eq!(1588, expansion_score(&start, &instructions, 10));
-        assert_eq!(1, expansion_score_2(&start, &instructions, 1));
-        assert_eq!(1588, expansion_score_2(&start, &instructions, 10));
     }
 
     #[test]
@@ -190,13 +104,12 @@ CN -> C";
         let lines = read_lines_filter_ok("input/day14");
         let (start, instructions) = parse_lines(&lines);
         assert_eq!(3587, expansion_score(&start, &instructions, 10));
-        assert_eq!(3587, expansion_score_2(&start, &instructions, 10));
     }
 
     #[test]
     fn part_two() {
         let lines = read_lines_filter_ok("input/day14");
         let (start, instructions) = parse_lines(&lines);
-        assert_eq!(3587, expansion_score_2(&start, &instructions, 25));
+        assert_eq!(3906445077999, expansion_score(&start, &instructions, 40));
     }
 }
