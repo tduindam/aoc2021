@@ -16,7 +16,7 @@ pub fn parse_ints(line: &str, separator: &str) -> Vec<u32> {
         .collect()
 }
 
-pub fn split_list(input: &str) -> Vec<String> {
+pub fn split_lines(input: &str) -> Vec<String> {
     input.split("\n").map(|l| l.to_string()).collect()
 }
 

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::reader::split_list;
+use crate::reader::split_lines;
 
 type Point = (i32, i32);
 
@@ -156,7 +156,7 @@ mod test {
 
 fold along y=7
 fold along x=5";
-        let (pos, folds) = parse(split_list(input));
+        let (pos, folds) = parse(split_lines(input));
         assert_eq!(18, pos.len());
         assert_eq!(2, folds.len());
         let folded = fold(pos, folds[0]);

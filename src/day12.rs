@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::reader::split_list;
+use crate::reader::split_lines;
 
 type Node = String;
 type NodeList = Vec<String>;
@@ -30,7 +30,7 @@ fn append(new: &str, path: &Path) -> Path {
 }
 
 fn find_paths(input: &str, allow_second_small: bool) -> Vec<Path> {
-    let lines = split_list(input);
+    let lines = split_lines(input);
     let mut edges = EdgeMap::new();
     for line in lines {
         parse(&line, &mut edges);
