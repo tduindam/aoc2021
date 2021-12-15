@@ -111,12 +111,15 @@ mod test {
 
         let lines = split_lines(input);
 
-        assert_eq!(Some(40), find_path(lines));
+        assert_eq!(Some(40), find_path_lines(lines));
     }
 
     #[test]
     fn part_one() {
-        assert_eq!(Some(720), find_path(read_lines_filter_ok("input/day15")));
+        assert_eq!(
+            Some(720),
+            find_path_lines(read_lines_filter_ok("input/day15"))
+        );
     }
 
     #[test]
@@ -174,14 +177,12 @@ mod test {
 
         let lines = split_lines(input);
 
-        assert_eq!(Some(315), find_path(lines));
+        assert_eq!(Some(315), find_path_lines(lines));
     }
 
     #[test]
     fn part_two() {
-        assert_eq!(
-            Some(720),
-            find_path(enlarge(read_lines_filter_ok("input/day15-2")))
-        );
+        let (size, grid) = expand(read_lines_filter_ok("input/day15"));
+        assert_eq!(Some(720), find_path(size, grid));
     }
 }
