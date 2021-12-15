@@ -21,7 +21,10 @@ pub fn split_lines(input: &str) -> Vec<String> {
 }
 
 pub fn parse_grid(raw_input: &str) -> ((usize, usize), Vec<u32>) {
-    let input: Vec<String> = raw_input.split("\n").map(|l| l.to_string()).collect();
+    parse_grid_lines(raw_input.split("\n").map(|l| l.to_string()).collect())
+}
+
+pub fn parse_grid_lines(input: Vec<String>) -> ((usize, usize), Vec<u32>) {
     let col_size = input.len();
 
     let parsed: Vec<u32> = input

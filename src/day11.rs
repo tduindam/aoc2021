@@ -1,3 +1,5 @@
+use crate::neighbors;
+use crate::neighbors::{neighbors, PosType};
 use crate::reader::parse_grid;
 
 pub fn main() {
@@ -118,80 +120,6 @@ fn simulate(
     }
     (all_glows, day)
 }
-
-fn neighbors(
-    (x, y): (i32, i32),
-    pos_type: PosType,
-) -> Box<dyn Iterator<Item = (i32, i32)> + 'static> {
-    let neighbors = match pos_type {
-        PosType::Gen => GEN_NEIGHBORS.iter(),
-        PosType::L => L_NEIGHBORS.iter(),
-        PosType::R => R_NEIGHBORS.iter(),
-        PosType::LT => LT_NEIGHBORS.iter(),
-        PosType::RT => RT_NEIGHBORS.iter(),
-        PosType::LB => LB_NEIGHBORS.iter(),
-        PosType::RB => RB_NEIGHBORS.iter(),
-        PosType::B => B_NEIGHBORS.iter(),
-        PosType::T => T_NEIGHBORS.iter(),
-    };
-    Box::new(neighbors.map(move |(o_x, o_y)| (x + *o_x as i32, y + *o_y as i32)))
-}
-
-enum PosType {
-    Gen,
-    L,
-    R,
-    LT,
-    RT,
-    LB,
-    RB,
-    B,
-    T,
-}
-
-impl PosType {
-    fn from_index(index: u32, (row_size, col_size): (u32, u32)) -> ((i32, i32), Self) {
-        let x = (index % row_size) as i32;
-        let y = (index / row_size) as i32;
-        ((x, y), Self::from((x, y), (row_size, col_size)))
-    }
-    fn from(pos: (i32, i32), (row_size, col_size): (u32, u32)) -> Self {
-        let max_x = (row_size - 1) as i32;
-        let max_y = (col_size - 1) as i32;
-
-        match pos {
-            (0, 0) => PosType::LT,
-            (x, 0) if x == max_x => PosType::RT,
-            (_, 0) => PosType::T,
-            (0, y) if y == max_y => PosType::LB,
-            (x, y) if y == max_y && x == max_x => PosType::RB,
-            (_, y) if y == max_y => PosType::B,
-            (0, _) => PosType::L,
-            (x, _) if x == max_x => PosType::R,
-            (_, _) => PosType::Gen,
-        }
-    }
-}
-
-const GEN_NEIGHBORS: [(i8, i8); 8] = [
-    (-1, -1),
-    (0, -1),
-    (1, -1),
-    (-1, 0),
-    (1, 0),
-    (-1, 1),
-    (0, 1),
-    (1, 1),
-];
-
-const R_NEIGHBORS: [(i8, i8); 5] = [(-1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
-const L_NEIGHBORS: [(i8, i8); 5] = [(0, -1), (1, -1), (1, 0), (0, 1), (1, 1)];
-const T_NEIGHBORS: [(i8, i8); 5] = [(-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
-const B_NEIGHBORS: [(i8, i8); 5] = [(-1, 0), (1, 0), (-1, -1), (0, -1), (1, -1)];
-const LT_NEIGHBORS: [(i8, i8); 3] = [(1, 0), (0, 1), (1, 1)];
-const RT_NEIGHBORS: [(i8, i8); 3] = [(-1, 0), (-1, 1), (0, 1)];
-const RB_NEIGHBORS: [(i8, i8); 3] = [(-1, -1), (0, -1), (-1, 0)];
-const LB_NEIGHBORS: [(i8, i8); 3] = [(0, -1), (1, -1), (1, 0)];
 
 #[cfg(test)]
 mod test {
