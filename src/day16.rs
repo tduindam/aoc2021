@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
+use nom::combinator::{map, map_res};
+use nom::complete::{tag, take};
+use nom::sequence::tuple;
+use nom::IResult;
 
 use crate::day16::PacketPayload::Literal;
 
@@ -38,13 +42,38 @@ enum PacketPayload {
     SubPacket(Vec<Packet>),
 }
 
-impl Packet {
-    fn from_str(_: &str) -> Self {
+fn from_num(input: &str) -> Result<u32, std::num::ParseIntError> {
+    u32::from_str_radix(input, 2)
+}
+
+fn num_primary(input: &str) -> IResult<&str, u32> {
+    let parse = take(3usize)(input);
+    parse(input);
+    // take(3)(input)
+}
+
+fn packet(input: &str) -> IResult<&str, Packet> {
+    let bits: String = input
+        .chars()
+        .filter_map(|c| HEX_MAP.get(&c))
+        .map(|r| r.to_string())
+        .collect();
+    let (version, type_id, payload) = tuple((num_primary, num_primary, packet))(input)?;
+
+    Ok((
+        input,
         Packet {
             version: 0,
             type_id: 0,
             payload: Literal(0),
-        }
+        },
+    ))
+}
+
+impl Packet {
+    fn from_str(input: &str) -> Self {
+        let (_, result) = packet(input).unwrap();
+        result
     }
 
     fn version_sum(&self) -> u32 {
