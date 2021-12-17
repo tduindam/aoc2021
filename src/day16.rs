@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
-use nom::combinator::{map, map_res};
-use nom::complete::{tag, take};
-use nom::sequence::tuple;
+use nom::branch::alt;
+use nom::bytes::complete::{tag, take};
+use nom::combinator::map_res;
+use nom::multi::{count, many1, many_till};
+use nom::sequence::{preceded, tuple};
 use nom::IResult;
 
 use crate::day16::PacketPayload::Literal;
@@ -31,53 +33,107 @@ lazy_static! {
 
 #[derive(Debug, Eq, PartialEq)]
 struct Packet {
-    version: u32,
-    type_id: u32,
+    version: u64,
+    type_id: u64,
     payload: PacketPayload,
 }
 
 #[derive(Debug, Eq, PartialEq)]
 enum PacketPayload {
-    Literal(u32),
+    Literal(u64),
     SubPacket(Vec<Packet>),
 }
 
-fn from_num(input: &str) -> Result<u32, std::num::ParseIntError> {
-    u32::from_str_radix(input, 2)
+fn from_num(input: &str) -> Result<u64, std::num::ParseIntError> {
+    u64::from_str_radix(input, 2)
 }
 
-fn num_primary(input: &str) -> IResult<&str, u32> {
-    let parse = take(3usize)(input);
-    parse(input);
-    // take(3)(input)
+fn num_primary(input: &str) -> IResult<&str, u64> {
+    map_res(take(3usize), from_num)(input)
 }
 
-fn packet(input: &str) -> IResult<&str, Packet> {
+fn parse_header(input: &str) -> IResult<&str, (u64, u64)> {
+    tuple((num_primary, num_primary))(input)
+}
+
+fn parse_literal(input: &str) -> IResult<&str, PacketPayload> {
+    let (input, (mut chunks, last)) = many_till(
+        preceded(tag("1"), take(4usize)),
+        preceded(tag("0"), take(4usize)),
+    )(input)?;
+    chunks.push(last);
+    let joined = chunks.join("");
+    let payload = u64::from_str_radix(joined.as_str(), 2).unwrap();
+    Ok((input, PacketPayload::Literal(payload)))
+}
+
+fn parse_fixed_length(input: &str) -> IResult<&str, PacketPayload> {
+    let (input, payload_size) = preceded(
+        tag("0"),
+        map_res(take(15usize), |s: &str| u32::from_str_radix(s, 2)),
+    )(input)?;
+
+    let (rest, payload) = take(payload_size)(input)?;
+    let (_, payload) = many1(packet)(payload)?;
+    Ok((rest, PacketPayload::SubPacket(payload)))
+}
+
+fn parse_number_packets(input: &str) -> IResult<&str, PacketPayload> {
+    let (input, num_packets) = preceded(
+        tag("1"),
+        map_res(take(11usize), |s: &str| u32::from_str_radix(s, 2)),
+    )(input)?;
+
+    let (input, payload) = count(packet, num_packets as usize)(input)?;
+
+    Ok((input, PacketPayload::SubPacket(payload)))
+}
+
+fn parse_operator(input: &str) -> IResult<&str, PacketPayload> {
+    alt((parse_fixed_length, parse_number_packets))(input)
+}
+
+fn payload(input: &str, type_id: u64) -> IResult<&str, PacketPayload> {
+    match type_id {
+        4 => parse_literal(input),
+        _ => parse_operator(input),
+    }
+}
+
+fn parse_packet_from_hex(input: &str) -> Packet {
     let bits: String = input
         .chars()
         .filter_map(|c| HEX_MAP.get(&c))
         .map(|r| r.to_string())
         .collect();
-    let (version, type_id, payload) = tuple((num_primary, num_primary, packet))(input)?;
+    packet(&bits).unwrap().1
+}
 
+fn packet(input: &str) -> IResult<&str, Packet> {
+    let (rest, (version, type_id)) = parse_header(&input)?;
+    let (rest, payload) = payload(rest, type_id)?;
     Ok((
-        input,
+        rest,
         Packet {
-            version: 0,
-            type_id: 0,
-            payload: Literal(0),
+            version,
+            type_id,
+            payload,
         },
     ))
 }
 
 impl Packet {
     fn from_str(input: &str) -> Self {
-        let (_, result) = packet(input).unwrap();
-        result
+        parse_packet_from_hex(input)
     }
 
-    fn version_sum(&self) -> u32 {
-        0
+    fn version_sum(&self) -> u64 {
+        self.version + {
+            match &self.payload {
+                Literal(_) => 0,
+                PacketPayload::SubPacket(packets) => packets.iter().map(|p| p.version_sum()).sum(),
+            }
+        }
     }
 }
 
@@ -120,13 +176,13 @@ mod test {
                 type_id: 6,
                 payload: SubPacket(vec![
                     Packet {
-                        version: 0,
-                        type_id: 0,
+                        version: 6,
+                        type_id: 4,
                         payload: Literal(10),
                     },
                     Packet {
-                        version: 0,
-                        type_id: 0,
+                        version: 2,
+                        type_id: 4,
                         payload: Literal(20),
                     },
                 ]),
@@ -143,18 +199,18 @@ mod test {
                 type_id: 3,
                 payload: SubPacket(vec![
                     Packet {
-                        version: 0,
-                        type_id: 0,
+                        version: 2,
+                        type_id: 4,
                         payload: Literal(1),
                     },
                     Packet {
-                        version: 0,
-                        type_id: 0,
+                        version: 4,
+                        type_id: 4,
                         payload: Literal(2),
                     },
                     Packet {
-                        version: 0,
-                        type_id: 0,
+                        version: 1,
+                        type_id: 4,
                         payload: Literal(3),
                     },
                 ]),
@@ -169,17 +225,17 @@ mod test {
         assert_eq!(
             Packet {
                 version: 4,
-                type_id: 0,
+                type_id: 2,
                 payload: PacketPayload::SubPacket(vec![Packet {
                     version: 1,
-                    type_id: 0,
+                    type_id: 2,
                     payload: PacketPayload::SubPacket(vec![Packet {
                         version: 5,
-                        type_id: 0,
+                        type_id: 2,
                         payload: PacketPayload::SubPacket(vec![Packet {
                             version: 6,
                             type_id: 4,
-                            payload: Literal(0),
+                            payload: Literal(15),
                         }]),
                     }]),
                 }]),
@@ -190,14 +246,25 @@ mod test {
     }
 
     #[test]
-    fn part_one_small_sums() {
+    fn part_one_small_5() {
+        let packet = Packet::from_str("620080001611562C8802118E34");
+
+        assert_eq!(12, packet.version_sum());
+    }
+
+    #[test]
+    fn part_one_small_6() {
         assert_eq!(
             23,
-            Packet::from_str("A0016C880162017C3686B18A3D4780").version_sum()
+            Packet::from_str("C0015000016115A2E0802F182340").version_sum()
         );
+    }
+
+    #[test]
+    fn part_one_small_7() {
         assert_eq!(
             31,
-            Packet::from_str("C0015000016115A2E0802F182340").version_sum()
+            Packet::from_str("A0016C880162017C3686B18A3D4780").version_sum()
         );
     }
 
