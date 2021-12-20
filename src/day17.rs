@@ -16,18 +16,38 @@ fn solve_for_t(v_0: f64, y: f64) -> Option<f64> {
     }
 }
 
+fn step_number(t: f64, is_first: bool) -> u64 {
+    if !is_first {
+        return t as u64;
+    }
+
+    if t.fract() > 1e-9 {
+        t as u64
+    } else {
+        //Count being on the edge as the previous step
+        (t - 1f64) as u64
+    }
+}
+
+fn same_step(t0: f64, t1: f64) -> bool {
+    let t0 = step_number(t0, true);
+    let t1 = step_number(t1, false);
+    return t0 == t1;
+}
+
 fn y_on_target(y0: f64, y_start: f64, y_end: f64) -> Option<(u64, u64)> {
     let t0 = solve_for_t(y0, y_start);
     let t1 = solve_for_t(y0, y_end);
     if t0.is_none() {
         return None;
     }
-    let t0 = t0.unwrap() as u64;
-    if let Some(t1) = t1 {
-        let t1 = t1 as u64;
 
-        if t1 > t0 {
-            Some((t0, t1))
+    let t0 = t0.unwrap();
+    if let Some(t1) = t1 {
+        let t1 = t1;
+
+        if !same_step(t0, t1) {
+            Some((t0 as u64, t1 as u64))
         } else {
             None
         }
@@ -41,11 +61,6 @@ fn find_opt_y(y_start: i32, y_end: i32) -> u64 {
     let y_end = y_end as f64;
     (0..10000)
         .map(|i| i as f64)
-        // .filter(|y0| {
-        //     let t0 = solve_for_t(*y0, y_start).unwrap() as u64;
-        //     let t1 = solve_for_t(*y0, y_end).unwrap() as u64;
-        //     t1 > t0
-        // })
         .filter(|y0| y_on_target(*y0, y_start, y_end).is_some())
         .map(|y| y as u64)
         .max()
@@ -56,9 +71,10 @@ fn peak(v_0: f64) -> f64 {
     simulate(v_0, v_0 + 0.5f64).round()
 }
 
-fn simulate_x(v_0: i32, (x_s, x_e): (i32, i32)) -> bool {
+fn simulate_x(v_0: i32, (x_s, x_e): (i32, i32)) -> Option<(i32, (u64, u64))> {
     let mut v = v_0;
     let mut p = 0;
+    let mut range: Option<(u64, u64)> = None;
     for t in 0..100000 {
         p += v;
         if v.abs() > 0 {
@@ -66,26 +82,38 @@ fn simulate_x(v_0: i32, (x_s, x_e): (i32, i32)) -> bool {
         }
 
         if p >= x_s && p <= x_e {
-            println!("Solved at t {}", t);
-
-            return true;
+            range = match range {
+                Some((s, _)) => Some((s, t)),
+                None => Some((t, t)),
+            };
         }
-        if v == 0 {
-            println!("No overlap at t {}", t);
-            return false;
+        if v == 0 || p > x_e {
+            return match range {
+                None => None,
+                Some(range) => Some((v_0, range)),
+            };
         }
     }
-    return false;
+    return None;
 }
 
 fn all_solutions((x_s, x_e): (i32, i32), (y_s, y_e): (i32, i32)) -> Vec<(i32, i32)> {
     let all_ys = all_solutions_y(y_s, y_e);
-
     let all_xs = all_solutions_x(x_s, x_e);
 
     all_ys
         .iter()
-        .map(|y| all_xs.iter().map(|x| (*x, *y)).collect::<Vec<(i32, i32)>>())
+        .map(|y| {
+            all_xs
+                .iter()
+                // .filter()
+                .filter(|(x, (t_s, t_e))| {
+
+                    simulate(*y as f64, t_s as f64))
+                }
+                // .map(|(x, t)| (*x, *y, *t))
+                .collect::<Vec<(i32, i32)>>()
+        })
         .flatten()
         .collect::<Vec<_>>()
 }
@@ -101,11 +129,10 @@ fn all_solutions_y(y_s: i32, y_e: i32) -> Vec<i32> {
         .collect()
 }
 
-fn all_solutions_x(x_s: i32, x_e: i32) -> Vec<i32> {
-    let all_xs: Vec<_> = (-500..500)
-        .filter(|x0| simulate_x(*x0, (x_s, x_e)))
-        .collect();
-    all_xs
+fn all_solutions_x(x_s: i32, x_e: i32) -> Vec<(i32, (u64, u64))> {
+    (-500..500)
+        .filter_map(|x0| simulate_x(x0, (x_s, x_e)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -154,16 +181,6 @@ mod test {
         expected.sort_by(|(a0, b0), (a1, b1)| a0.cmp(a1).then_with(|| b0.cmp(b1)));
         let all_solutions = all_solutions((20, 30), (-5, -10));
 
-        assert_eq!(
-            expected.iter().map(|(x, _)| *x).collect::<Vec<_>>(),
-            all_solutions.iter().map(|(x, _)| *x).collect::<Vec<_>>()
-        );
-
-        assert_eq!(
-            expected.iter().map(|(_, y)| *y).collect::<Vec<_>>(),
-            all_solutions.iter().map(|(_, y)| *y).collect::<Vec<_>>()
-        );
-
         assert_eq!(expected, all_solutions);
         // assert_eq!(expected.len(), all_solutions((20, 30), (-5, -10)).len());
     }
@@ -180,12 +197,20 @@ mod test {
     }
 
     #[test]
+    fn pt_2_same_step() {
+        assert_eq!(false, same_step(1.0, 1.884));
+        assert_eq!(false, same_step(8.6, 9.17));
+        assert_eq!(false, same_step(10.0, 10.844288770224761));
+        assert_eq!(true, same_step(23.426860441876563, 23.844288770224761));
+    }
+
+    #[test]
     fn part_two_ys() {
         let mut expected = test_output().iter().map(|(_, y)| *y).collect::<Vec<_>>();
         expected.sort();
         expected.dedup();
 
-        assert_eq!(expected, all_solutions_y(20, 30));
+        assert_eq!(expected, all_solutions_y(-5, -10));
     }
 
     fn test_output() -> Vec<(i32, i32)> {
