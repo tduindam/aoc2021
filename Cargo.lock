@@ -3,11 +3,12 @@
 version = 3
 
 [[package]]
-name = "day1"
+name = "aoc_2021"
 version = "0.1.0"
 dependencies = [
  "lazy_static",
  "nom",
+ "roots",
 ]
 
 [[package]]
@@ -38,6 +39,12 @@ dependencies = [
  "minimal-lexical",
  "version_check",
 ]
+
+[[package]]
+name = "roots"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c36d2bbc763f480668d6d6790ae2fdd2e52ac0c21a3a26d156f3534a3d9eea9"
 
 [[package]]
 name = "version_check"
