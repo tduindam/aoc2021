@@ -1,3 +1,5 @@
+use std::mem::swap;
+
 use roots::{find_roots_quadratic, Roots};
 
 fn simulate(v_0: f64, t: f64) -> f64 {
@@ -36,17 +38,19 @@ fn same_step(t0: f64, t1: f64) -> bool {
 }
 
 fn y_on_target(y0: f64, y_start: f64, y_end: f64) -> Option<(u64, u64)> {
-    let t0 = solve_for_t(y0, y_start);
-    let t1 = solve_for_t(y0, y_end);
+    let t1 = solve_for_t(y0, y_start);
+    let t0 = solve_for_t(y0, y_end);
     if t0.is_none() {
         return None;
     }
 
-    let t0 = t0.unwrap();
+    let mut t0 = t0.unwrap().ceil();
     if let Some(t1) = t1 {
-        let t1 = t1;
-
+        let mut t1 = t1.floor();
         if !same_step(t0, t1) {
+            if t0 > t1 {
+                swap(&mut t0, &mut t1);
+            }
             Some((t0 as u64, t1 as u64))
         } else {
             None
@@ -83,14 +87,20 @@ fn simulate_x(v_0: i32, (x_s, x_e): (i32, i32)) -> Option<(i32, (u64, u64))> {
 
         if p >= x_s && p <= x_e {
             range = match range {
-                Some((s, _)) => Some((s, t)),
-                None => Some((t, t)),
+                Some((s, _)) => Some((s, t + 1)),
+                None => Some((t + 1, t + 1)),
             };
         }
         if v == 0 || p > x_e {
             return match range {
                 None => None,
-                Some(range) => Some((v_0, range)),
+                Some(range) => {
+                    if v == 0 {
+                        Some((v_0, (range.0, u64::MAX)))
+                    } else {
+                        Some((v_0, range))
+                    }
+                }
             };
         }
     }
@@ -103,29 +113,38 @@ fn all_solutions((x_s, x_e): (i32, i32), (y_s, y_e): (i32, i32)) -> Vec<(i32, i3
 
     all_ys
         .iter()
-        .map(|y| {
+        .map(|(y, (s_y, e_y))| {
             all_xs
                 .iter()
-                // .filter()
-                .filter(|(x, (t_s, t_e))| {
+                .filter_map(|(x, (s_x, e_x))| {
+                    let overlaps = s_x <= e_y && s_y <= e_x;
 
-                    simulate(*y as f64, t_s as f64))
-                }
-                // .map(|(x, t)| (*x, *y, *t))
+                    if overlaps {
+                        Some((*x, *y))
+                    } else {
+                        None
+                    }
+                })
                 .collect::<Vec<(i32, i32)>>()
         })
         .flatten()
         .collect::<Vec<_>>()
 }
 
-fn all_solutions_y(y_s: i32, y_e: i32) -> Vec<i32> {
+fn all_solutions_y(y_s: i32, y_e: i32) -> Vec<(i32, (u64, u64))> {
     let y_start = y_s as f64;
     let y_end = y_e as f64;
 
     (-1000..1000)
         .map(|i| i as f64)
-        .filter(|y0| y_on_target(*y0, y_start, y_end).is_some())
-        .map(|y| y as i32)
+        .filter_map(|y0| {
+            if let Some((t0, t1)) = y_on_target(y0, y_start, y_end) {
+                Some((y0 as i32, (t0, t1)))
+            } else {
+                None
+            }
+        })
+        // .map(|y| y as i32)
         .collect()
 }
 
@@ -162,14 +181,14 @@ mod test {
     //
     #[test]
     fn part_one_small() {
-        let opt_y = find_opt_y(-5, -10);
+        let opt_y = find_opt_y(-10, -5);
         assert_eq!(9, opt_y);
         assert_eq!(45, peak(opt_y as f64) as u64);
     }
 
     #[test]
     fn part_one() {
-        let opt_y = find_opt_y(-69, -126);
+        let opt_y = find_opt_y(-126, -69);
         assert_eq!(125, opt_y);
         assert_eq!(7875, peak(opt_y as f64) as u64);
     }
@@ -179,19 +198,23 @@ mod test {
         let mut expected = test_output();
 
         expected.sort_by(|(a0, b0), (a1, b1)| a0.cmp(a1).then_with(|| b0.cmp(b1)));
-        let all_solutions = all_solutions((20, 30), (-5, -10));
+        let mut all_solutions = all_solutions((20, 30), (-10, -5));
+        all_solutions.sort_by(|(a0, b0), (a1, b1)| a0.cmp(a1).then_with(|| b0.cmp(b1)));
 
         assert_eq!(expected, all_solutions);
-        // assert_eq!(expected.len(), all_solutions((20, 30), (-5, -10)).len());
+        assert_eq!(expected.len(), all_solutions.len());
     }
 
     #[test]
     fn part_two_xs() {
-        assert!(simulate_x(6, (20, 30)));
+        assert!(simulate_x(6, (20, 30)).is_some());
         let mut expected = test_output().iter().map(|(x, _)| *x).collect::<Vec<_>>();
         expected.sort();
         expected.dedup();
-        let all_xs = all_solutions_x(20, 30);
+        let all_xs = all_solutions_x(20, 30)
+            .iter()
+            .map(|(t, _)| *t)
+            .collect::<Vec<_>>();
 
         assert_eq!(expected, all_xs);
     }
@@ -210,7 +233,13 @@ mod test {
         expected.sort();
         expected.dedup();
 
-        assert_eq!(expected, all_solutions_y(-5, -10));
+        assert_eq!(
+            expected,
+            all_solutions_y(-10, -5)
+                .iter()
+                .map(|(y, _)| *y)
+                .collect::<Vec<_>>()
+        );
     }
 
     fn test_output() -> Vec<(i32, i32)> {
@@ -332,6 +361,6 @@ mod test {
 
     #[test]
     fn part_two() {
-        assert_eq!(100, all_solutions((217, 240), (-69, -126)).len());
+        assert_eq!(2321, all_solutions((217, 240), (-126, -69)).len());
     }
 }
