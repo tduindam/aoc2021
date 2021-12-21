@@ -12,28 +12,31 @@ use nom::IResult;
 
 use crate::day18::Number::PairNumber;
 
+#[derive(Debug)]
 enum Number {
     Regular(i64),
     PairNumber(Rc<Pair>),
 }
 
-impl Number {
-    pub fn set_parent(&mut self, parent: Rc<Pair>) {
-        match self {
-            Number::Regular(_) => {} // nothing to do
-            PairNumber(pair) => {
-                self = &mut PairNumber(Rc::new(Pair {
-                    parent: Some(parent),
-                    numbers: pair.numbers,
-                }))
-            }
-        }
-    }
+#[derive(Debug)]
+struct Pair {
+    numbers: (Number, Number),
 }
 
-struct Pair {
-    parent: Option<Rc<Pair>>,
-    numbers: (Number, Number),
+impl Pair {
+    fn new() -> Self {
+        Self {
+            numbers: (Number::Uninitialized, Number::Uninitialized),
+        }
+    }
+
+    fn apply(&mut self, depth: u32) {
+        let (n1, n2) = &self.numbers;
+        match n1 {
+            Number::Regular(_) => {}
+            PairNumber(_) => {}
+        }
+    }
 }
 
 fn parse_number_digits(input: &str) -> IResult<&str, Number> {
@@ -51,18 +54,15 @@ fn parse_number(input: &str) -> IResult<&str, Number> {
 }
 
 fn parse_pair(input: &str) -> IResult<&str, Rc<Pair>> {
+    let root = Rc::new(Pair::new());
+
     let (rest, (mut n1, mut n2)) = separated_pair(
         preceded(tag("["), parse_number),
         tag(","),
         terminated(parse_number, tag("]")),
     )(input)?;
 
-    let pair = Rc::new(Pair {
-        parent: None,
-        numbers: (n1, n2),
-    });
-    n1.set_parent(pair.clone());
-    n2.set_parent(pair.clone());
+    let pair = Rc::new(Pair { numbers: (n1, n2) });
     Ok((rest, pair))
 }
 
@@ -83,6 +83,9 @@ impl fmt::Display for Number {
             }
             Number::PairNumber(pair) => {
                 write!(f, "{}", *pair)
+            }
+            Number::Uninitialized => {
+                write!(f, "Uninitialized")
             }
         }
     }
@@ -120,6 +123,30 @@ mod test {
         assert_eq!(
             "[[[[1,3],[5,3]],[[1,3],[8,7]]],[[[4,9],[6,9]],[[8,2],[7,3]]]]",
             round_trip("[[[[1,3],[5,3]],[[1,3],[8,7]]],[[[4,9],[6,9]],[[8,2],[7,3]]]]")
+        );
+    }
+
+    #[test]
+    fn explode() {
+        assert_eq!(
+            "[[[[[9,8],1],2],3],4]",
+            parse_pair_primary("[[[[[9,8],1],2],3],4]").apply()
+        );
+        assert_eq!(
+            "[7,[6,[5,[4,[3,2]]]]]",
+            parse_pair_primary("[7,[6,[5,[7,0]]]]").apply()
+        );
+        assert_eq!(
+            "[[6,[5,[4,[3,2]]]],1]",
+            parse_pair_primary("[[6,[5,[7,0]]],3]").apply()
+        );
+        assert_eq!(
+            "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]",
+            parse_pair_primary("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]").apply()
+        );
+        assert_eq!(
+            "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
+            parse_pair_primary("[[3,[2,[8,0]]],[9,[5,[7,0]]]]")
         );
     }
 
