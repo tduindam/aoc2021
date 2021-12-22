@@ -1,41 +1,69 @@
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Formatter;
-use std::path::Display;
 use std::rc::Rc;
-use std::str::FromStr;
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{digit1, u64};
 use nom::sequence::{preceded, separated_pair, terminated};
 use nom::IResult;
 
-use crate::day18::Number::PairNumber;
+use crate::day18::Number::{PairNumber, Regular};
+
+type RcPair = Rc<RefCell<Pair>>;
 
 #[derive(Debug)]
 enum Number {
     Regular(i64),
-    PairNumber(Rc<Pair>),
+    PairNumber(RcPair),
 }
 
-#[derive(Debug)]
+impl Default for Number {
+    fn default() -> Self {
+        Regular(0)
+    }
+}
+
+#[derive(Debug, Default)]
 struct Pair {
     numbers: (Number, Number),
 }
 
-impl Pair {
-    fn new() -> Self {
-        Self {
-            numbers: (Number::Uninitialized, Number::Uninitialized),
+fn traverse(pair: RcPair, steps: Vec<RcPair>) {
+    if steps.len() == 4 {
+        explode(pair.clone(), steps);
+        return;
+    }
+
+    let (n1, n2) = &pair.borrow().numbers;
+    fn traverse_number(number: &Number, mut steps: Vec<RcPair>) {
+        match number {
+            Number::Regular(n) => {
+                println!("Found number {} at depth: {}", n, steps.len())
+            }
+            PairNumber(pair) => {
+                steps.push(pair.clone());
+                traverse(pair.clone(), steps);
+            }
         }
     }
 
-    fn apply(&mut self, depth: u32) {
-        let (n1, n2) = &self.numbers;
-        match n1 {
-            Number::Regular(_) => {}
-            PairNumber(_) => {}
-        }
+    traverse_number(n1, steps.clone());
+    traverse_number(n2, steps.clone());
+}
+
+fn explode(pair: RcPair, steps: Vec<RcPair>) {
+    let (n1, n2) = &pair.borrow().numbers;
+    let _n1 = if let Regular(n1) = n1 { n1} else { panic!("Invalid explode")};
+    let _n2 = if let Regular(n2) = n2 { n2} else { panic!("Invalid explode")};
+    pair.borrow_mut().
+}
+
+impl Pair {
+    fn apply(mut self) -> Self {
+        let wrapped = Rc::new(RefCell::new(self));
+        traverse(wrapped.clone(), Vec::new());
+        wrapped.take()
     }
 }
 
@@ -46,33 +74,27 @@ fn parse_number_digits(input: &str) -> IResult<&str, Number> {
 
 fn parse_number_pair(input: &str) -> IResult<&str, Number> {
     let (input, pair) = parse_pair(input)?;
-    Ok((input, Number::PairNumber(pair)))
+    Ok((input, Number::PairNumber(Rc::new(RefCell::new(pair)))))
 }
 
 fn parse_number(input: &str) -> IResult<&str, Number> {
     alt((parse_number_digits, parse_number_pair))(input)
 }
 
-fn parse_pair(input: &str) -> IResult<&str, Rc<Pair>> {
-    let root = Rc::new(Pair::new());
-
-    let (rest, (mut n1, mut n2)) = separated_pair(
+fn parse_pair(input: &str) -> IResult<&str, Pair> {
+    let (rest, (n1, n2)) = separated_pair(
         preceded(tag("["), parse_number),
         tag(","),
         terminated(parse_number, tag("]")),
     )(input)?;
 
-    let pair = Rc::new(Pair { numbers: (n1, n2) });
+    let pair = Pair { numbers: (n1, n2) };
     Ok((rest, pair))
 }
 
-fn parse_pair_primary(input: &str) -> Rc<Pair> {
+fn parse_pair_primary(input: &str) -> Pair {
     let (_, pair) = parse_pair(input).unwrap();
     pair
-}
-
-enum Day18Error {
-    ParseError,
 }
 
 impl fmt::Display for Number {
@@ -82,10 +104,7 @@ impl fmt::Display for Number {
                 write!(f, "{}", number)
             }
             Number::PairNumber(pair) => {
-                write!(f, "{}", *pair)
-            }
-            Number::Uninitialized => {
-                write!(f, "Uninitialized")
+                write!(f, "{}", pair.borrow())
             }
         }
     }
@@ -130,23 +149,27 @@ mod test {
     fn explode() {
         assert_eq!(
             "[[[[[9,8],1],2],3],4]",
-            parse_pair_primary("[[[[[9,8],1],2],3],4]").apply()
+            parse_pair_primary("[[[[[9,8],1],2],3],4]")
+                .apply()
+                .to_string()
         );
         assert_eq!(
             "[7,[6,[5,[4,[3,2]]]]]",
-            parse_pair_primary("[7,[6,[5,[7,0]]]]").apply()
+            parse_pair_primary("[7,[6,[5,[7,0]]]]").apply().to_string()
         );
         assert_eq!(
             "[[6,[5,[4,[3,2]]]],1]",
-            parse_pair_primary("[[6,[5,[7,0]]],3]").apply()
+            parse_pair_primary("[[6,[5,[7,0]]],3]").apply().to_string()
         );
         assert_eq!(
             "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]",
-            parse_pair_primary("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]").apply()
+            parse_pair_primary("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]")
+                .apply()
+                .to_string()
         );
         assert_eq!(
             "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
-            parse_pair_primary("[[3,[2,[8,0]]],[9,[5,[7,0]]]]")
+            parse_pair_primary("[[3,[2,[8,0]]],[9,[5,[7,0]]]]").to_string()
         );
     }
 
