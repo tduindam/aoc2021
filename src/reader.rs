@@ -17,7 +17,7 @@ pub fn parse_ints(line: &str, separator: &str) -> Vec<u32> {
 }
 
 pub fn split_lines(input: &str) -> Vec<String> {
-    input.split("\n").map(|l| l.to_string()).collect()
+    input.split("\n").map(|l| l.trim().to_string()).collect()
 }
 
 pub fn parse_grid(raw_input: &str) -> ((usize, usize), Vec<u32>) {
