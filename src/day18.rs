@@ -145,16 +145,6 @@ fn find_next_action(root: RcNumber) -> Option<Action> {
         })
         .next();
 
-    let split = flattened
-        .iter()
-        .filter_map(|n| {
-            if needs_split(n) {
-                Some(Action::Split(n.clone()))
-            } else {
-                None
-            }
-        })
-        .next();
     if let Some(explode) = explode {
         Some(explode)
     } else {
@@ -545,7 +535,7 @@ mod test {
     #[test]
     fn part_one() {
         assert_eq!(
-            0,
+            4435,
             magnitude(Rc::new(RefCell::new(sum(read_lines_filter_ok(
                 "input/day18"
             )))))
@@ -565,6 +555,6 @@ mod test {
             })
             .max()
             .unwrap();
-        assert_eq!(0, max);
+        assert_eq!(4802, max);
     }
 }
