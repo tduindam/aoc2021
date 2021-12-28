@@ -219,7 +219,7 @@ fn split(number: RcNumber) -> Option<RcNumber> {
     let value = extract_value(number.clone()) as f64;
     let left = Regular((value / 2f64).floor() as i64);
     let right = Regular((value / 2f64).ceil() as i64);
-    let mut left = Number::new_rc(left);
+    let left = Number::new_rc(left);
     let right = Number::new_rc(right);
     let new_pair = PairNumber(left.clone(), right.clone());
     left.borrow_mut().parent = Some(number.clone());

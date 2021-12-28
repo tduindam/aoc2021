@@ -144,7 +144,6 @@ fn all_solutions_y(y_s: i32, y_e: i32) -> Vec<(i32, (u64, u64))> {
                 None
             }
         })
-        // .map(|y| y as i32)
         .collect()
 }
 
