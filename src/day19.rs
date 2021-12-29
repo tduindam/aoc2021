@@ -1,4 +1,5 @@
 use crate::day19::Direction::*;
+use itertools::Itertools;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alphanumeric1, line_ending};
 use nom::character::streaming::space1;
@@ -7,6 +8,15 @@ use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::{delimited, pair, terminated, tuple};
 use nom::IResult;
 use std::collections::HashSet;
+use std::fs;
+
+pub fn main() {
+    let input = fs::read_to_string("input/day19").unwrap();
+    let scanners = parse_primary(input.to_string());
+    let solution = Solution::solve(scanners, 12);
+    println!("Day 19 - 1 {}", solution.beacons.len());
+    println!("Day 19 - 2 {}", solution.max_distance());
+}
 
 #[derive(Debug, Copy, Clone)]
 enum Direction {
@@ -28,6 +38,7 @@ struct Point {
 }
 
 impl Point {
+    #[allow(dead_code)]
     fn manhattan_dist(&self, other: &Self) -> i64 {
         (self.x - other.x).abs() + (self.y - other.y).abs() + (self.z - other.z).abs()
     }
@@ -95,63 +106,68 @@ impl Scanner {
         (reference, deltas)
     }
 
-    fn overlapping_beacons(&self, other: &Scanner) -> HashSet<Point> {
+    //Returns points transformed if there is overlap >= threshold
+    fn overlapping_beacons(
+        &self,
+        other: &Scanner,
+        overlap_threshold: usize,
+    ) -> Option<(Point, Vec<Point>)> {
         let orientations = make_orientations();
-        let (reference_self, deltas) = self.delta(0, &orientations[0]);
+
         println!(
             "Computing overlap between {:?} and {:?}",
             self.name, other.name
         );
-        let overlap: Option<(&Orientation, Point, Point, i64)> = orientations
+        let overlap = orientations
             .iter()
             .filter_map(|ori| {
-                let overlaps = (0..other.beacons.len())
-                    .map(|reference_index| {
-                        let (other_reference, other_deltas) = other.delta(reference_index, ori);
-                        assert_eq!(deltas.len(), other_deltas.len());
-                        let dist: i64 = deltas
-                            .iter()
-                            .zip(other_deltas.iter())
-                            .map(|(a, b)| a.manhattan_dist(b))
-                            .sum();
-                        let translation = reference_self.translate(&other_reference);
-                        (other_reference, translation, dist)
-                    })
-                    .filter(|(_, _, cost)| *cost == 0)
-                    .next();
+                (0..self.beacons.len())
+                    .filter_map(|ref_index| {
+                        let (reference_self, deltas) = self.delta(ref_index, &orientations[0]);
+                        let deltas_self: HashSet<Point> = deltas.into_iter().collect();
+                        let overlaps = (0..other.beacons.len())
+                            .filter_map(|reference_index| {
+                                let mut overlap = deltas_self.clone();
+                                let (other_reference, other_deltas) =
+                                    other.delta(reference_index, ori);
+                                overlap.extend(other_deltas.iter());
+                                //Check if there are at least `overlap_threshold` new points
+                                let not_overlapping = overlap.len() - deltas_self.len();
+                                if other.beacons.len() - not_overlapping >= overlap_threshold {
+                                    let translation = other_reference.translate(&reference_self);
+                                    Some((other_reference, translation))
+                                } else {
+                                    None
+                                }
+                            })
+                            .next();
 
-                match overlaps {
-                    Some((reference, translation, distance)) => {
-                        Some((ori, reference, translation, distance))
-                    }
-                    None => None,
-                }
+                        match overlaps {
+                            Some((reference, translation)) => Some((ori, reference, translation)),
+                            None => None,
+                        }
+                    })
+                    .next()
             })
             .next();
-        let (ori, other_reference, translation, distance) = overlap.unwrap();
+        let (ori, _other_reference, translation) = if let Some(overlap) = overlap {
+            overlap
+        } else {
+            return None;
+        };
 
         //other reference is already translated into space of the first scanner
-
-        assert_eq!(distance, 0);
-        println!("Overlaps {:?} {:?}", other_reference, ori);
+        // println!("Overlaps {:?} {:?}", other_reference, ori);
         let translated_points: Vec<Point> = other
             .beacons
             .iter()
             .map(|b| {
                 let b = b.rotate(ori);
                 b.translate(&translation)
-                //
-                // let rotated = self.beacons[i].rotate(ori);
-                // let delta = rotated.translate(&reference);
             })
             .collect();
-        println!("Points {:?}", translated_points);
-
-        let mut unique_beacons: HashSet<Point> = self.beacons.clone().into_iter().collect();
-        unique_beacons.extend(translated_points.iter());
-
-        println!("Unique Beacons: {:?}", unique_beacons);
-        unique_beacons
+        // println!("Points {:?}", translated_points);
+        Some((translation, translated_points))
     }
 
     pub fn new(name: String, beacons: Vec<Point>) -> Self {
@@ -164,8 +180,21 @@ impl Scanner {
 }
 
 impl Solution {
+    fn max_distance(&self) -> u64 {
+        self.scanners
+            .iter()
+            .filter_map(|s| s.position)
+            .combinations(2)
+            .map(|points| points[0].manhattan_dist(&points[1]))
+            .max()
+            .unwrap() as u64
+    }
+
     fn solve(mut scanners: Vec<Scanner>, overlap_threshold: usize) -> Self {
+        //Weird pop front
+        scanners.reverse();
         let mut first = scanners.pop().unwrap();
+        scanners.reverse();
         let beacons: HashSet<Point> = first.beacons.clone().into_iter().collect();
         first.position = Some(Point::new(0, 0, 0));
         let mut solution = Self {
@@ -182,49 +211,33 @@ impl Solution {
                             .scanners
                             .iter()
                             .filter_map(|scanner_a| {
-                                let overlap = scanner_a.overlapping_beacons(scanner_b);
-
-                                if overlap.len() >= overlap_threshold {
-                                    Some((overlap, scanner_a))
-                                } else {
-                                    None
-                                }
+                                scanner_a.overlapping_beacons(scanner_b, overlap_threshold)
                             })
                             .next();
                         match overlap {
                             None => None,
-                            Some((overlap, scanner_a)) => Some((overlap, scanner_a, scanner_b)),
+                            Some(overlap) => Some((overlap, scanner_b)),
                         }
                     })
                     .next()
             };
 
             //must have overlap
-            let (overlap, scanner_a, scanner_b) = overlap.unwrap();
-            //Overlapping points are in 'scanner_a' translation, just add the relative translation of that scanner
-            let name = scanner_b.name.clone();
-            solution.scanners.push(scanner_b.clone());
-            //ignore scanner positions
+            let ((translation, overlap), scanner_b) = overlap.unwrap();
             solution.beacons.extend(overlap.iter());
-            scanners.retain(|s| s.name != name);
+            //Overlapping points are in 'scanner_a' translation, just add the relative translation of that scanner
+            let solved_scanner_b = Scanner {
+                name: scanner_b.name.clone(),
+                beacons: overlap,
+                position: Some(translation),
+            };
+            scanners.retain(|s| s.name != solved_scanner_b.name);
+            solution.scanners.push(solved_scanner_b);
+            println!("Scanners {:?}", scanners);
         }
 
         solution
     }
-}
-
-fn overlapping(scanners: Vec<Scanner>) -> HashSet<Point> {
-    let first = scanners[0].clone();
-    scanners
-        .iter()
-        .fold(HashSet::<Point>::new(), |mut acc, scanner| {
-            if first.name == scanner.name {
-                acc.extend(first.beacons.iter());
-            } else {
-                acc.extend(first.overlapping_beacons(scanner).iter());
-            }
-            acc
-        })
 }
 
 //Orientations, first is index second is sign
@@ -321,9 +334,8 @@ mod test {
 -5,0
 -2,1";
         let scanners = parse_primary(input.to_string());
-        let overlapping_beacons = scanners[0].overlapping_beacons(&scanners[1]);
-        assert_eq!(3, overlapping_beacons.len());
-        assert_eq!(3, overlapping(scanners.clone()).len());
+        let overlapping_beacons = scanners[0].overlapping_beacons(&scanners[1], 3);
+        assert_eq!(3, overlapping_beacons.unwrap().1.len());
         let solution = Solution::solve(scanners, 3);
         assert_eq!(3, solution.beacons.len())
     }
@@ -456,18 +468,24 @@ mod test {
         let input = fs::read_to_string("input/day19-small").unwrap();
         let scanners = parse_primary(input.to_string());
         let solution = Solution::solve(scanners, 12);
+        println!("solution: {:?}", solution);
         assert_eq!(79, solution.beacons.len());
+        assert_eq!(3621, solution.max_distance());
     }
     #[test]
-    fn part_one() {
+    fn part_one_small02() {
+        let input = fs::read_to_string("input/day19-small02").unwrap();
+        let scanners = parse_primary(input.to_string());
+        let solution = Solution::solve(scanners, 12);
+
+        assert_eq!(39, solution.beacons.len());
+    }
+    #[test]
+    fn part_one_two() {
         let input = fs::read_to_string("input/day19").unwrap();
         let scanners = parse_primary(input.to_string());
         let solution = Solution::solve(scanners, 12);
-        assert_eq!(0, solution.beacons.len());
-    }
-
-    #[test]
-    fn part_two() {
-        assert!(false);
+        assert_eq!(438, solution.beacons.len());
+        assert_eq!(3621, solution.max_distance());
     }
 }

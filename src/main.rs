@@ -49,6 +49,7 @@ fn main() {
             11 => day11::main(),
             14 => day14::main(),
             15 => day15::main(),
+            19 => day19::main(),
             _ => eprintln!("No such day ({})", day),
         },
         Err(e) => eprintln!("Could not parse input {:?}", e),
