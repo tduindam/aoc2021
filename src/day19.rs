@@ -1,7 +1,6 @@
 use crate::day19::Direction::*;
-use itertools::Itertools;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alphanumeric1, newline};
+use nom::character::complete::{alphanumeric1, line_ending};
 use nom::character::streaming::space1;
 use nom::combinator::opt;
 use nom::multi::{many0, many1, separated_list1};
@@ -9,6 +8,7 @@ use nom::sequence::{delimited, pair, terminated, tuple};
 use nom::IResult;
 use std::collections::HashSet;
 
+#[derive(Debug, Copy, Clone)]
 enum Direction {
     PosX,
     NegX,
@@ -17,6 +17,8 @@ enum Direction {
     PosZ,
     NegZ,
 }
+
+type Orientation = [Direction; 3];
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
 struct Point {
@@ -38,17 +40,16 @@ impl Point {
         }
     }
 
-    fn rotate(&self, ori: &Vec<(i64, i64)>) -> Self {
-        fn single_transform(p: &Point, (index, sign): (i64, i64)) -> i64 {
-            let p = match index {
-                0 => p.x,
-                1 => p.y,
-                2 => p.z,
-                _ => {
-                    unreachable!()
-                }
-            };
-            p * sign
+    fn rotate(&self, ori: &Orientation) -> Self {
+        fn single_transform(p: &Point, direction: Direction) -> i64 {
+            match direction {
+                PosX => p.x,
+                NegX => -p.x,
+                PosY => p.y,
+                NegY => -p.y,
+                PosZ => p.z,
+                NegZ => -p.z,
+            }
         }
 
         Self {
@@ -79,61 +80,69 @@ struct Scanner {
 
 impl Scanner {
     //Insert orientations here
-    fn delta(&self, index: usize, ori: &Vec<(i64, i64)>) -> (Point, Vec<Point>) {
+    fn delta(&self, index: usize, ori: &Orientation) -> (Point, Vec<Point>) {
         let mut deltas = Vec::<Point>::new();
-        let origin = self.beacons[index];
+        let reference = self.beacons[index].rotate(&ori);
         for i in 0..self.beacons.len() {
             if i == index {
                 continue;
             }
             let rotated = self.beacons[i].rotate(ori);
-            println!(
-                "origin {:?} rotated {:?} beacon {:?}",
-                origin, rotated, self.beacons[i]
-            );
-            deltas.push(origin.translate(&rotated));
+            let delta = rotated.translate(&reference);
+            deltas.push(delta);
         }
-        (origin, deltas)
+        deltas.sort();
+        (reference, deltas)
     }
 
     fn overlapping_beacons(&self, other: &Scanner) -> HashSet<Point> {
         let orientations = make_orientations();
-        let (origin, deltas) = self.delta(0, &orientations[0]);
-        let overlap: Option<(&Vec<(i64, i64)>, Point, i64)> = orientations
+        let (reference_self, deltas) = self.delta(0, &orientations[0]);
+        println!(
+            "Computing overlap between {:?} and {:?}",
+            self.name, other.name
+        );
+        let overlap: Option<(&Orientation, Point, Point, i64)> = orientations
             .iter()
             .filter_map(|ori| {
-                println!("Examining {:?}", ori);
                 let overlaps = (0..other.beacons.len())
-                    .map(|origin_index| {
-                        let (other_origin, other_deltas) = other.delta(origin_index, ori);
+                    .map(|reference_index| {
+                        let (other_reference, other_deltas) = other.delta(reference_index, ori);
                         assert_eq!(deltas.len(), other_deltas.len());
                         let dist: i64 = deltas
                             .iter()
                             .zip(other_deltas.iter())
                             .map(|(a, b)| a.manhattan_dist(b))
                             .sum();
-                        (other_origin, dist)
+                        let translation = reference_self.translate(&other_reference);
+                        (other_reference, translation, dist)
                     })
-                    .filter(|(_, cost)| *cost == 0)
+                    .filter(|(_, _, cost)| *cost == 0)
                     .next();
 
                 match overlaps {
-                    Some((origin, distance)) => Some((ori, origin, distance)),
+                    Some((reference, translation, distance)) => {
+                        Some((ori, reference, translation, distance))
+                    }
                     None => None,
                 }
             })
             .next();
-        let (_ori, other_origin, distance) = overlap.unwrap();
-        //TODO: insert size of scanner
+        let (ori, other_reference, translation, distance) = overlap.unwrap();
+
+        //other reference is already translated into space of the first scanner
+
         assert_eq!(distance, 0);
-        println!("Overlaps {:?} {}", other_origin, distance);
-        let delta = other_origin.rotate(_ori).translate(&origin);
+        println!("Overlaps {:?} {:?}", other_reference, ori);
         let translated_points: Vec<Point> = other
             .beacons
             .iter()
             .map(|b| {
-                let b = b.rotate(_ori);
-                b.translate(&delta)
+                let b = b.rotate(ori);
+                b.translate(&translation)
+                //
+                // let rotated = self.beacons[i].rotate(ori);
+                // let delta = rotated.translate(&reference);
             })
             .collect();
         println!("Points {:?}", translated_points);
@@ -219,51 +228,33 @@ fn overlapping(scanners: Vec<Scanner>) -> HashSet<Point> {
 }
 
 //Orientations, first is index second is sign
-fn make_orientations() -> Vec<Vec<(i64, i64)>> {
+fn make_orientations() -> Vec<Orientation> {
     vec![
-        vec![PosX, PosY, PosZ],
-        vec![PosY, NegX, PosZ],
-        vec![NegX, NegY, PosZ],
-        vec![NegY, PosX, PosZ],
-        vec![PosX, NegY, NegZ],
-        vec![NegY, NegX, NegZ],
-        vec![NegX, PosY, NegZ],
-        vec![PosY, PosX, NegZ],
-        vec![NegZ, PosY, PosX],
-        vec![PosY, PosZ, PosX],
-        vec![PosZ, NegY, PosX],
-        vec![NegY, NegZ, PosX],
-        vec![PosZ, PosY, NegX],
-        vec![PosY, NegZ, NegX],
-        vec![NegZ, NegY, NegX],
-        vec![NegY, PosZ, NegX],
-        vec![PosX, NegZ, PosY],
-        vec![NegZ, NegX, PosY],
-        vec![NegX, PosZ, PosY],
-        vec![PosZ, PosX, PosY],
-        vec![PosX, PosZ, NegY],
-        vec![PosZ, NegX, NegY],
-        vec![NegX, NegZ, NegY],
-        vec![NegZ, PosX, NegY],
-    ];
-
-    let dirs = vec![0, 1, 2];
-    let permutations = dirs.iter().permutations(3);
-    permutations
-        .map(|dirs| {
-            vec![
-                // vec![(*dirs[2], 1), (*dirs[1], 1), (*dirs[0], 1)],
-                // vec![(*dirs[2], -1), (*dirs[1], -1), (*dirs[0], 1)],
-                // vec![(*dirs[2], -1), (*dirs[1], 1), (*dirs[0], 1)],
-                // vec![(*dirs[2], 1), (*dirs[1], -1), (*dirs[0], 1)],
-                vec![(*dirs[0], 1), (*dirs[1], 1), (*dirs[2], 1)],
-                vec![(*dirs[0], -1), (*dirs[1], -1), (*dirs[2], 1)],
-                vec![(*dirs[0], -1), (*dirs[1], 1), (*dirs[2], 1)],
-                vec![(*dirs[0], 1), (*dirs[1], -1), (*dirs[2], 1)],
-            ]
-        })
-        .flatten()
-        .collect::<Vec<_>>()
+        [PosX, PosY, PosZ],
+        [PosY, NegX, PosZ],
+        [NegX, NegY, PosZ],
+        [NegY, PosX, PosZ],
+        [PosX, NegY, NegZ],
+        [NegY, NegX, NegZ],
+        [NegX, PosY, NegZ],
+        [PosY, PosX, NegZ],
+        [NegZ, PosY, PosX],
+        [PosY, PosZ, PosX],
+        [PosZ, NegY, PosX],
+        [NegY, NegZ, PosX],
+        [PosZ, PosY, NegX],
+        [PosY, NegZ, NegX],
+        [NegZ, NegY, NegX],
+        [NegY, PosZ, NegX],
+        [PosX, NegZ, PosY],
+        [NegZ, NegX, PosY],
+        [NegX, PosZ, PosY],
+        [PosZ, PosX, PosY],
+        [PosX, PosZ, NegY],
+        [PosZ, NegX, NegY],
+        [NegX, NegZ, NegY],
+        [NegZ, PosX, NegY],
+    ]
 }
 
 fn parse_beacon(input: &str) -> IResult<&str, Point> {
@@ -282,7 +273,7 @@ fn parse_beacon(input: &str) -> IResult<&str, Point> {
 }
 
 fn parse_beacons(input: &str) -> IResult<&str, Vec<Point>> {
-    let (input, payload) = many1(terminated(parse_beacon, opt(newline)))(input)?;
+    let (input, payload) = many1(terminated(parse_beacon, opt(line_ending)))(input)?;
     Ok((input, payload))
 }
 
@@ -290,7 +281,7 @@ fn parse_header(input: &str) -> IResult<&str, String> {
     let (input, (name, _, number)) = delimited(
         tag("--- "),
         tuple((alphanumeric1, space1, alphanumeric1)),
-        tag(" ---\n"),
+        pair(tag(" ---"), line_ending),
     )(input)?;
     Ok((input, format!("{} {}", name, number)))
 }
@@ -298,7 +289,7 @@ fn parse_header(input: &str) -> IResult<&str, String> {
 fn parse_scanners(input: &str) -> IResult<&str, Vec<Scanner>> {
     let (input, parsed_pairs) = many1(terminated(
         pair(parse_header, parse_beacons),
-        many0(newline),
+        many0(line_ending),
     ))(input)?;
 
     Ok((
@@ -355,36 +346,63 @@ mod test {
             .collect::<Vec<_>>();
 
         let expected = vec![
-            //facing +x / -x
             Point::new(1, 2, 3),
-            Point::new(-1, -2, 3),
-            Point::new(-1, 2, 3),
-            Point::new(1, -2, 3),
-            Point::new(1, 3, 2),
-            Point::new(-1, -3, 2),
-            Point::new(-1, 3, 2),
-            Point::new(1, -3, 2),
-            //Y
-            Point::new(2, 1, 3),
-            Point::new(-2, -1, 3),
-            Point::new(-2, 1, 3),
             Point::new(2, -1, 3),
-            Point::new(2, 3, 1),
-            Point::new(-2, -3, 1),
-            Point::new(-2, 3, 1),
-            Point::new(2, -3, 1),
-            //Z
-            Point::new(3, 1, 2),
-            Point::new(-3, -1, 2),
-            Point::new(-3, 1, 2),
-            Point::new(3, -1, 2),
-            Point::new(3, 2, 1),
-            Point::new(-3, -2, 1),
+            Point::new(-1, -2, 3),
+            Point::new(-2, 1, 3),
+            Point::new(1, -2, -3),
+            Point::new(-2, -1, -3),
+            Point::new(-1, 2, -3),
+            Point::new(2, 1, -3),
+            //Y
             Point::new(-3, 2, 1),
+            Point::new(2, 3, 1),
             Point::new(3, -2, 1),
+            Point::new(-2, -3, 1),
+            Point::new(3, 2, -1),
+            Point::new(2, -3, -1),
+            Point::new(-3, -2, -1),
+            Point::new(-2, 3, -1),
+            //Z
+            Point::new(1, -3, 2),
+            Point::new(-3, -1, 2),
+            Point::new(-1, 3, 2),
+            Point::new(3, 1, 2),
+            Point::new(1, 3, -2),
+            Point::new(3, -1, -2),
+            Point::new(-1, -3, -2),
+            Point::new(-3, 1, -2),
         ];
 
         assert_eq!(expected, transformed);
+
+        let p = Point { x: 2, y: -1, z: 3 };
+        let r = [NegX, NegZ, NegY];
+        assert_eq!(Point::new(-2, -3, 1), p.rotate(&r));
+    }
+
+    #[test]
+    fn part_one_small_rotate_2() {
+        let input = "--- scanner 0 ---
+-1,-1,1
+-2,-2,2
+-3,-3,3
+-2,-3,1
+5,6,-4
+8,0,7
+
+--- scanner 1 ---
+1,-1,1
+2,-2,2
+3,-3,3
+2,-1,3
+-5,4,-6
+-8,-7,0";
+
+        let mut scanners = parse_primary(input.to_string());
+        scanners.reverse();
+        let solution = Solution::solve(scanners, 6);
+        assert_eq!(6, solution.beacons.len());
     }
 
     #[test]
