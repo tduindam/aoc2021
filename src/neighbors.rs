@@ -70,6 +70,19 @@ impl PosType {
     }
 }
 
+/// YES DIAGONALS, YES SELF
+pub const GEN_NEIGHBORS_SELF: [(i8, i8); 9] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (0, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+];
+
 ///YES DIAGONALS
 pub const GEN_NEIGHBORS: [(i8, i8); 8] = [
     (-1, -1),
